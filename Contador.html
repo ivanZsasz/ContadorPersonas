@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contador de Personas</title>
+    
+    <!-- Carga de Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configuración de Tailwind para habilitar el modo oscuro con la clase 'dark' -->
+    <script>
+        // La configuración de Tailwind ahora se ejecuta después de que la librería ha sido cargada.
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+
+    <style>
+        /* Configuraciones de estilo globales y de tipografía */
+        :root {
+            --primary-color: #3b82f6; /* Blue 500 */
+            --secondary-color: #f59e0b; /* Amber 500 (Amarillo) */
+            --danger-color: #ef4444; /* Red 500 (Rojo) */
+            --green-color: #22c55e; /* Green 500 (Verde) */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s ease;
+        }
+        /* La sombra se adapta mejor en modo claro y oscuro */
+        .counter-card {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        .dark .counter-card {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+        }
+        .input-field {
+            /* Estilo base para los inputs de límites */
+            padding: 0.4rem 1rem; /* Ajustado para subir el texto */
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db; /* gray-300 */
+            width: 100%;
+            text-align: center;
+            font-weight: 500;
+            transition: border-color 0.2s;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+        .dark .input-field {
+            background-color: #374151; /* gray-700 */
+            color: #f3f4f6; /* gray-100 */
+            border-color: #4b5563; /* gray-600 */
+        }
+        .dark .input-field:focus {
+             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+        }
+        /* Clase para dar la misma altura a los botones */
+        .control-btn {
+            height: 4.5rem; /* Altura fija para uniformidad visual */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            line-height: 1.2;
+        }
+        /* Estilo para la notificación que aparece en el centro */
+        #notification-content {
+            min-width: 280px;
+        }
+        
+        /* Nuevos estilos del botón de reinicio */
+        #reset-btn {
+            background: linear-gradient(135deg, var(--danger-color), #b91c1c); /* Red 500 a Red 700 */
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3), 0 2px 4px -2px rgba(239, 68, 68, 0.15);
+        }
+        #reset-btn:hover {
+            background: linear-gradient(135deg, #ef4444, #7f1d1d); /* Se oscurece al pasar el ratón */
+            box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.4), 0 4px 6px -4px rgba(239, 68, 68, 0.2);
+        }
+        #reset-btn:active {
+            transform: scale(0.98);
+            box-shadow: none;
+        }
+        /* Adaptación a Modo Oscuro para el botón de reinicio */
+        .dark #reset-btn {
+            background: linear-gradient(135deg, #991b1b, #7f1d1d); /* Red 800 a Red 900 */
+            box-shadow: 0 4px 6px -1px rgba(255, 255, 255, 0.1), 0 2px 4px -2px rgba(255, 255, 255, 0.05);
+        }
+        .dark #reset-btn:hover {
+             background: linear-gradient(135deg, #7f1d1d, #450a0a);
+        }
+
+        /* Estilo para el contenedor de la gráfica */
+        .chart-container {
+            position: relative;
+            height: 300px; /* Altura fija para el contenedor del gráfico */
+            width: 100%;
+            margin-bottom: 2rem;
+            background-color: #f9fafb; /* light gray for canvas background */
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
+        .dark .chart-container {
+             background-color: #1f2937; /* dark gray for canvas background */
+        }
+    </style>
+</head>
+<!-- Eliminado el responsive: p-8 asegura que el contenedor esté centrado en todas las pantallas -->
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex items-center justify-center p-8">
+
+    <!-- Tarjeta Principal del Contador (Fija en max-w-lg y centrada) -->
+    <div class="counter-card bg-white dark:bg-gray-800 w-full max-w-lg mx-auto p-8 rounded-xl transition duration-300">
+
+        <!-- Contenedor Flex para Título, Botón de Menú y Switch de Tema -->
+        <div class="flex justify-between items-center mb-4 relative">
+            
+            <!-- Lado Izquierdo: Botón de Menú y Dropdown -->
+            <div class="relative z-10">
+                <!-- Botón de Menú -->
+                <button id="menu-toggle" class="p-2 rounded-full text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition duration-200" aria-label="Abrir menú de opciones">
+                    <!-- Icono de Barras (Menu) -->
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+                
+                <!-- Dropdown Menú (Inicialmente oculto) -->
+                <div id="dropdown-menu" class="absolute left-0 mt-2 w-48 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg hidden transition duration-150 ease-out z-20 overflow-hidden">
+                    <!-- NUEVA OPCIÓN: Ver Estadísticas -->
+                    <button id="view-stats-btn" class="w-full text-left block px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                        📊 Ver Panel de Estadísticas
+                    </button>
+                    <!-- Funcionalidad Exportar reubicada -->
+                    <div class="border-t border-gray-200 dark:border-gray-600 my-1"></div>
+                    <button id="menu-export-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                        Exportar Datos (.csv)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Título Centrado (CLAVE: Posicionamiento Absoluto) -->
+            <h1 class="text-3xl font-extrabold text-gray-800 dark:text-gray-100 absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-0 whitespace-nowrap">
+                Contador de Personas
+            </h1>
+
+
+            <!-- Botón para cambiar el tema (Switch) -->
+            <button id="theme-toggle" class="p-2 rounded-full text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition duration-200 z-10" aria-label="Cambiar tema a oscuro o claro">
+                <!-- Ícono de la Luna (Moon) -->
+                <svg id="moon-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                </svg>
+                <!-- Ícono del Sol (Sun) -->
+                <svg id="sun-icon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- ======================================= -->
+        <!-- VIEW 1: CONTADOR PRINCIPAL (Por defecto) -->
+        <!-- ======================================= -->
+        <div id="counter-view">
+            <!-- CAMPO PARA NOMBRAR EL LUGAR -->
+            <div class="mb-6">
+                <label for="location-name" class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Contador para el lugar (Ej: Sala A)</label>
+                <input type="text" id="location-name" placeholder="Nombre del lugar (Ej: Biblioteca Central)" class="input-field text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500" value="Ubicación sin nombre" />
+            </div>
+            <!-- FIN CAMPO PARA NOMBRAR EL LUGAR -->
+
+            <!-- SECCIÓN DE LÍMITES -->
+            <div class="flex justify-between items-start space-x-4 mb-8 text-base">
+                <div class="w-1/2">
+                    <label for="min-limit" class="block font-semibold text-gray-600 dark:text-gray-300 mb-1">Mínimo Permitido</label>
+                    <input type="number" id="min-limit" value="0" min="0" class="input-field text-gray-900 dark:text-gray-100" />
+                </div>
+                <div class="w-1/2">
+                    <label for="max-limit" class="block font-semibold text-gray-600 dark:text-gray-300 mb-1">Aforo Máximo</label>
+                    <input type="number" id="max-limit" value="100" min="1" class="input-field text-gray-900 dark:text-gray-100" />
+                </div>
+            </div>
+            <!-- FIN SECCIÓN DE LÍMITES -->
+
+            <!-- Muestra del Conteo -->
+            <div class="text-center mb-6">
+                <p class="text-xl font-medium text-gray-500 dark:text-gray-400 mb-2">Total Actual</p>
+                <div id="count-display" class="text-9xl font-black text-gray-900 dark:text-white leading-none tracking-tighter transition duration-200">
+                    0
+                </div>
+            </div>
+            
+            <!-- SECCIÓN DE PORCENTAJE DE AFORO (Texto) -->
+            <div class="text-center mb-6 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                <p class="text-base font-semibold text-gray-700 dark:text-gray-200 mb-1">Ocupación del Aforo Máximo</p>
+                <div id="capacity-percentage-display" class="4xl font-extrabold text-green-600 dark:text-green-500">
+                    0.0%
+                </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Máximo Aforo: <span id="max-limit-value-display" class="font-bold">100</span></p>
+            </div>
+            <!-- FIN SECCIÓN DE PORCENTAJE DE AFORO (Texto) -->
+
+            <!-- CONTENEDOR PRINCIPAL: Controles y Visualización Gráfica -->
+            <div class="flex flex-row space-y-0 items-center">
+                
+                <!-- LADO IZQUIERDO: Controles (W-2/3 fijo) -->
+                <!-- CLAVE: Se añade pr-8 para separar esta columna de la gráfica -->
+                <div class="w-2/3 flex flex-col justify-center space-y-4 h-full pr-8"> 
+                    
+                    <!-- CONTROLES PRINCIPALES CON DISEÑO DE DOBLE COLUMNA -->
+                    <div class="flex space-x-4">
+                        <!-- COLUMNA IZQUIERDA: SALIDA (DECREMENTO) -->
+                        <div class="flex flex-col space-y-3 w-1/2">
+                            <button id="decrement-10-btn"
+                                    data-step="-10"
+                                    class="control-btn text-base font-semibold text-white bg-blue-700 hover:bg-blue-800 active:bg-blue-900 disabled:bg-gray-500 rounded-lg transition duration-200 focus:outline-none focus:ring-4 focus:ring-blue-300 shadow-md hover:shadow-lg"
+                                    aria-label="Disminuir el conteo en 10">
+                                <span class="text-3xl font-bold">-10</span>
+                                <span class="text-xs font-normal opacity-75">Salida</span>
+                            </button>
+                            <button id="decrement-5-btn"
+                                    data-step="-5"
+                                    class="control-btn text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-500 rounded-lg transition duration-200 focus:outline-none focus:ring-4 focus:ring-blue-300 shadow-md hover:shadow-lg"
+                                    aria-label="Disminuir el conteo en 5">
+                                <span class="text-2xl font-bold">-5</span>
+                                <span class="text-xs font-normal opacity-75">Salida</span>
+                            </button>
+                            <button id="decrement-btn"
+                                    data-step="-1"
+                                    class="control-btn text-lg font-semibold text-white bg-[var(--primary-color)] hover:bg-blue-600 active:bg-blue-700 disabled:bg-gray-500 rounded-lg transition duration-200 focus:outline-none focus:ring-4 focus:ring-blue-300 shadow-md hover:shadow-lg"
+                                    aria-label="Disminuir el conteo en 1">
+                                <span class="text-xl font-bold">-1</span>
+                                <span class="text-xs font-normal opacity-75">Salida</span>
+                            </button>
+                        </div>
+
+                        <!-- COLUMNA DERECHA: ENTRADA (INCREMENTO) -->
+                        <div class="flex flex-col space-y-3 w-1/2">
+                            <button id="increment-10-btn"
+                                    data-step="10"
+                                    class="control-btn text-base font-semibold text-white bg-green-700 hover:bg-green-800 active:bg-green-900 disabled:bg-gray-500 rounded-lg transition duration-200 focus:outline-none focus:ring-4 focus:ring-green-300 shadow-md hover:shadow-lg"
+                                    aria-label="Aumentar el conteo en 10">
+                                <span class="text-3xl font-bold">+10</span>
+                                <span class="text-xs font-normal opacity-75">Entrada</span>
+                            </button>
+                            <button id="increment-5-btn"
+                                    data-step="5"
+                                    class="control-btn text-base font-semibold text-white bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:bg-gray-500 rounded-lg transition duration-200 focus:outline-none focus:ring-4 focus:ring-green-300 shadow-md hover:shadow-lg"
+                                    aria-label="Aumentar el conteo en 5">
+                                <span class="text-2xl font-bold">+5</span>
+                                <span class="text-xs font-normal opacity-75">Entrada</span>
+                            </button>
+                            <button id="increment-btn"
+                                    data-step="1"
+                                    class="control-btn text-lg font-semibold text-white bg-[var(--green-color)] hover:bg-green-600 active:bg-green-700 disabled:bg-gray-500 rounded-lg transition duration-200 focus:outline-none focus:ring-4 focus:ring-green-300 shadow-md hover:shadow-lg"
+                                    aria-label="Aumentar el conteo en 1">
+                                <span class="text-xl font-bold">+1</span>
+                                <span class="text-xs font-normal opacity-75">Entrada</span>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- FIN CONTROLES PRINCIPALES -->
+                    
+                    <!-- Botones de Acción (Reiniciar) -->
+                    <div class="flex space-x-2 pt-2">
+                        <!-- Botón de Reset AHORA OCUPA TODO EL ESPACIO DISPONIBLE -->
+                        <button id="reset-btn"
+                                class="w-full px-6 py-3 font-medium text-white rounded-lg transition duration-200 focus:outline-none focus:ring-4 focus:ring-red-500/50 shadow-lg hover:shadow-xl active:scale-[0.98]"
+                                aria-label="Reiniciar el conteo a cero">
+                            Reiniciar Conteo (Cero)
+                        </button>
+                    </div>
+                    
+                </div>
+                
+                <!-- LADO DERECHO: Visualización Gráfica (W-1/3 fijo) - GRÁFICO CIRCULAR -->
+                <div class="w-1/3 flex flex-col justify-center items-center h-full p-2">
+                    <p class="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-2 whitespace-nowrap">Aforo Gráfico</p>
+                    
+                    <!-- Contenedor para la Gráfica Circular -->
+                    <div id="capacity-visualizer-container" 
+                         class="relative w-full max-w-[200px] aspect-square flex items-center justify-center">
+
+                        <!-- SVG del Gráfico Circular -->
+                        <!-- Atributo role="presentation" para accesibilidad -->
+                        <svg viewBox="0 0 100 100" class="w-full h-full transform -rotate-90" role="presentation">
+                            <!-- Fondo del círculo (pista) -->
+                            <circle cx="50" cy="50" r="45" fill="none" stroke="#e5e7eb" stroke-width="10" 
+                                    class="dark:stroke-gray-700 transition-colors duration-500"></circle>
+                            <!-- Círculo de progreso. Usamos stroke-dasharray para el progreso. -->
+                            <circle id="capacity-circle" cx="50" cy="50" r="45" fill="none" 
+                                    stroke="var(--green-color)" stroke-width="10" 
+                                    stroke-linecap="round" 
+                                    style="stroke-dasharray: 0 282.7; transition: stroke-dasharray 0.5s ease-out, stroke 0.5s ease-out;"></circle>
+                        </svg>
+
+                        <!-- Texto central con el % (Aumento el tamaño del texto a 3xl) -->
+                        <div class="absolute text-xl font-bold text-gray-800 dark:text-gray-100" aria-hidden="true">
+                            <span id="circle-percentage-text" class="text-3xl">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- FIN CONTENEDOR PRINCIPAL -->
+        </div>
+
+        <!-- ======================================= -->
+        <!-- VIEW 2: PANEL DE ESTADÍSTICAS (Oculto)   -->
+        <!-- ======================================= -->
+        <div id="stats-view" class="hidden">
+            <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 border-b pb-2 border-gray-200 dark:border-gray-700">
+                Panel de Estadísticas
+            </h2>
+            
+            <!-- Botón Volver -->
+            <button id="view-counter-btn" class="mb-6 px-4 py-2 font-medium text-white bg-gray-500 hover:bg-gray-600 active:bg-gray-700 rounded-lg transition duration-200 focus:outline-none focus:ring-4 focus:ring-gray-300">
+                ← Volver al Contador
+            </button>
+
+            <!-- GRÁFICO 1: Evolución del conteo por minuto/hora -->
+            <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-200 mb-3">
+                Evolución del Conteo (Sesión Actual)
+            </h3>
+            <div class="chart-container">
+                <canvas id="evolutionChart"></canvas>
+                <p id="no-data-msg" class="text-center text-gray-500 dark:text-gray-400 mt-2 hidden">No hay suficientes datos para el gráfico.</p>
+            </div>
+
+            <!-- GRÁFICO 2: Entradas vs. Salidas por hora (Espacio para futuro desarrollo) -->
+            <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-200 mb-3 mt-8">
+                Entradas vs. Salidas (Requiere Base de Datos)
+            </h3>
+            <div class="chart-container flex items-center justify-center">
+                <p class="text-center text-gray-500 dark:text-gray-400">
+                    Este gráfico y la comparativa diaria **requieren una base de datos** (como Firebase Firestore) para procesar y persistir datos por hora y por día.
+                </p>
+            </div>
+        </div>
+        <!-- FIN PANEL DE ESTADÍSTICAS -->
+        
+    </div>
+    
+    <!-- NOTIFICACIÓN TRANSITORIA DE AFORO (80% y 100%) -->
+    <div id="transient-notification" class="fixed inset-0 flex items-center justify-center p-4 pointer-events-none opacity-0 transition-opacity duration-700 z-50">
+        <div id="notification-content" class="px-8 py-6 rounded-xl text-white text-center shadow-2xl transform transition-transform duration-300 scale-100">
+            <!-- El contenido de la notificación transitoria se inserta aquí -->
+            <p id="notification-title" class="text-2xl font-extrabold mb-1"></p>
+            <p id="notification-message" class="text-lg font-medium"></p>
+        </div>
+    </div>
+    <!-- FIN NOTIFICACIÓN TRANSITORIA -->
+
+    <!-- Lógica JavaScript -->
+    <script>
+        // Variables globales y acceso a elementos del DOM
+        let count = 0;
+        let notificationTimeout; 
+        let logHistory = []; // Array para almacenar el registro de actividad
+        let evolutionChartInstance = null; // Instancia del gráfico de evolución
+        
+        // --- FLAGS para controlar que las alertas solo salgan una vez por umbral ---
+        let alert80Shown = false;
+        let alertMaxShown = false;
+        // --------------------------------------------------------------------------
+
+        // Elementos de la interfaz
+        const display = document.getElementById('count-display');
+        const resetBtn = document.getElementById('reset-btn');
+        const locationNameInput = document.getElementById('location-name'); 
+        
+        // --- Elementos de VISTA ---
+        let currentView = 'counter';
+        const counterView = document.getElementById('counter-view');
+        const statsView = document.getElementById('stats-view');
+        
+        // --- Elementos del Menú ---
+        const menuToggle = document.getElementById('menu-toggle');
+        const dropdownMenu = document.getElementById('dropdown-menu');
+        const menuExportBtn = document.getElementById('menu-export-btn');
+        const viewStatsBtn = document.getElementById('view-stats-btn');
+        const viewCounterBtn = document.getElementById('view-counter-btn');
+        
+        // --- Elementos de la NUEVA notificación transitoria ---
+        const transientNotification = document.getElementById('transient-notification');
+        const notificationContent = document.getElementById('notification-content');
+        const notificationTitle = document.getElementById('notification-title');
+        const notificationMessage = document.getElementById('notification-message');
+        
+        // Elementos de la sección de porcentaje de aforo
+        const capacityPercentageDisplay = document.getElementById('capacity-percentage-display');
+        const maxLimitValueDisplay = document.getElementById('max-limit-value-display');
+        
+        // --- Elementos del Gráfico Circular ---
+        const capacityCircle = document.getElementById('capacity-circle');
+        const circlePercentageText = document.getElementById('circle-percentage-text');
+        const CIRCUMFERENCE = 2 * Math.PI * 45; // Circunferencia del círculo (r=45)
+        
+        // --- Elementos de LÍMITES ---
+        const minLimitInput = document.getElementById('min-limit');
+        const maxLimitInput = document.getElementById('max-limit');
+        let COUNT_MIN = parseInt(minLimitInput.value) || 0; 
+        let COUNT_MAX = parseInt(maxLimitInput.value) || Infinity; 
+
+        // --- Elementos para el Switch de Tema ---
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const htmlElement = document.documentElement; 
+        const sunIcon = document.getElementById('sun-icon');
+        const moonIcon = document.getElementById('moon-icon');
+
+        // --- Botones de paso rápido ---
+        const buttons = document.querySelectorAll('button[data-step]');
+
+        // --- Funciones de Persistencia (Local Storage temporal) ---
+
+        function initLocationName() {
+            const savedName = localStorage.getItem('locationName');
+            if (savedName) {
+                locationNameInput.value = savedName;
+            } else {
+                localStorage.setItem('locationName', locationNameInput.value);
+            }
+        }
+
+        function saveLog() {
+            try {
+                localStorage.setItem('logHistory', JSON.stringify(logHistory));
+            } catch (e) {
+                console.error("Error al guardar el log en localStorage:", e);
+            }
+        }
+
+        function loadLog() {
+            try {
+                const savedLog = localStorage.getItem('logHistory');
+                if (savedLog) {
+                    logHistory = JSON.parse(savedLog);
+                }
+            } catch (e) {
+                console.error("Error al cargar el log de localStorage:", e);
+                logHistory = [];
+            }
+        }
+        
+        // --- Funciones de Notificación ---
+        
+        function showTransientNotification(title, message, type, duration = 3000) {
+            if (notificationTimeout) {
+                clearTimeout(notificationTimeout);
+            }
+            notificationTitle.textContent = title;
+            notificationMessage.textContent = message;
+            notificationContent.classList.remove('bg-yellow-600', 'bg-red-600', 'bg-blue-600');
+            if (type === 'error') {
+                notificationContent.classList.add('bg-red-600');
+            } else if (type === 'warning') {
+                notificationContent.classList.add('bg-yellow-600');
+            } else {
+                notificationContent.classList.add('bg-blue-600');
+            }
+            transientNotification.classList.remove('opacity-0', 'pointer-events-none');
+            transientNotification.classList.add('opacity-100');
+            notificationTimeout = setTimeout(() => {
+                transientNotification.classList.remove('opacity-100');
+                transientNotification.classList.add('opacity-0');
+                setTimeout(() => {
+                    transientNotification.classList.add('pointer-events-none');
+                }, 700);
+            }, duration);
+        }
+
+        function hideTransientNotification() {
+            if (notificationTimeout) {
+                clearTimeout(notificationTimeout);
+                notificationTimeout = null;
+            }
+            transientNotification.classList.remove('opacity-100');
+            transientNotification.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        // --- Lógica de Gráficos (Stats Panel) ---
+        
+        /**
+         * Prepara los datos del log para el gráfico de evolución.
+         * Simplificamos los labels a HH:MM.
+         */
+        function prepareEvolutionData() {
+            // Utilizamos un Set para evitar duplicados de labels (aunque el log es secuencial)
+            // y un map para la data del conteo final
+            
+            const labels = logHistory.map(entry => {
+                const date = new Date(entry.time);
+                // Formato HH:MM
+                return date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
+            });
+
+            const data = logHistory.map(entry => entry.newCount);
+
+            return { labels, data };
+        }
+
+        /**
+         * Renderiza el gráfico de evolución (Línea).
+         */
+        function renderEvolutionChart() {
+            const chartData = prepareEvolutionData();
+            const canvas = document.getElementById('evolutionChart');
+            const noDataMsg = document.getElementById('no-data-msg');
+            
+            // Si hay menos de dos puntos, no mostramos el gráfico de línea.
+            if (chartData.data.length < 2) {
+                canvas.classList.add('hidden');
+                noDataMsg.classList.remove('hidden');
+                if (evolutionChartInstance) {
+                    evolutionChartInstance.destroy();
+                    evolutionChartInstance = null;
+                }
+                return;
+            }
+            
+            canvas.classList.remove('hidden');
+            noDataMsg.classList.add('hidden');
+
+            if (evolutionChartInstance) {
+                evolutionChartInstance.destroy();
+            }
+            
+            // Usamos un color que se vea bien en ambos modos
+            const chartLineColor = htmlElement.classList.contains('dark') ? '#93c5fd' : '#1e40af'; // Blue 300 / Blue 800
+
+            evolutionChartInstance = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{
+                        label: 'Conteo de Personas',
+                        data: chartData.data,
+                        borderColor: chartLineColor,
+                        backgroundColor: chartLineColor + '40', // 40 = 25% Opacity
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Número de Personas'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Hora (HH:MM)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Evolución del Conteo'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // --- Lógica de Vistas (Tabs) ---
+        
+        function switchView(viewName) {
+            currentView = viewName;
+            dropdownMenu.classList.add('hidden');
+            
+            if (viewName === 'stats') {
+                counterView.classList.add('hidden');
+                statsView.classList.remove('hidden');
+                // Llamamos a la función de renderizado de gráficos
+                renderEvolutionChart(); 
+            } else {
+                statsView.classList.add('hidden');
+                counterView.classList.remove('hidden');
+            }
+        }
+
+
+        // --- Lógica de Display y Contador ---
+
+        function updateDisplay() {
+            display.textContent = count;
+            
+            COUNT_MIN = parseInt(minLimitInput.value) || 0;
+            COUNT_MAX = parseInt(maxLimitInput.value) || Infinity; 
+            
+            let occupationPercentage = 0.0;
+            const currentMaxLimit = parseInt(maxLimitInput.value); 
+
+            maxLimitValueDisplay.textContent = currentMaxLimit;
+
+            if (currentMaxLimit > 0 && COUNT_MAX !== Infinity) {
+                occupationPercentage = Math.max(0, (count / currentMaxLimit) * 100);
+            }
+
+            const clampedPercentage = Math.min(occupationPercentage, 100.0).toFixed(1);
+            capacityPercentageDisplay.textContent = `${clampedPercentage}%`;
+            circlePercentageText.textContent = `${Math.round(clampedPercentage)}%`;
+
+            const dashoffset = (occupationPercentage / 100) * CIRCUMFERENCE;
+            capacityCircle.style.strokeDasharray = `${dashoffset} ${CIRCUMFERENCE}`;
+            
+            capacityPercentageDisplay.classList.remove('text-green-600', 'dark:text-green-500', 'text-yellow-600', 'dark:text-yellow-500', 'text-red-600', 'dark:text-red-500');
+            
+            let circleColor = 'var(--green-color)';
+            
+            if (occupationPercentage < 75) {
+                capacityPercentageDisplay.classList.add('text-green-600', 'dark:text-green-500'); 
+                circleColor = 'var(--green-color)';
+            } else if (occupationPercentage < 95) {
+                capacityPercentageDisplay.classList.add('text-yellow-600', 'dark:text-yellow-500'); 
+                circleColor = 'var(--secondary-color)';
+            } else {
+                 capacityPercentageDisplay.classList.add('text-red-600', 'dark:text-red-500'); 
+                 circleColor = 'var(--danger-color)';
+            }
+            
+            capacityCircle.setAttribute('stroke', circleColor);
+            circlePercentageText.style.color = circleColor;
+
+            const isMaxReached = (count >= COUNT_MAX);
+            const isMinReached = (count <= COUNT_MIN);
+            const isHighCapacity = (occupationPercentage >= 80 && occupationPercentage < 100); 
+
+            buttons.forEach(button => {
+                const step = parseInt(button.dataset.step);
+                let shouldBeDisabled = false;
+                
+                if (step > 0) {
+                    if (count + step > COUNT_MAX) {
+                        shouldBeDisabled = true;
+                    }
+                } else if (step < 0) {
+                    if (count + step < COUNT_MIN) {
+                        shouldBeDisabled = true;
+                    }
+                }
+                button.disabled = shouldBeDisabled;
+            });
+            
+            display.classList.add('scale-105');
+            setTimeout(() => {
+                display.classList.remove('scale-105');
+            }, 100);
+            
+            // Lógica de Notificaciones de Umbral
+            if (occupationPercentage < 80) {
+                alert80Shown = false;
+            }
+            if (count < COUNT_MAX) {
+                alertMaxShown = false;
+            }
+
+            if (isMaxReached && count > 0 && !alertMaxShown) {
+                 showTransientNotification('¡AFORO MÁXIMO!', `Se alcanzó el límite de ${COUNT_MAX} personas.`, 'error');
+                 alertMaxShown = true;
+                 alert80Shown = true;
+            } else if (isHighCapacity && !alert80Shown) {
+                 showTransientNotification('¡ATENCIÓN: AFORO ALTO!', `Ocupación al ${clampedPercentage}%.`, 'warning');
+                 alert80Shown = true;
+            } else {
+                 if (!resetBtn.isWaitingForConfirmation) {
+                     hideTransientNotification();
+                 }
+            }
+            
+            if (isMinReached && count > 0 && !resetBtn.isWaitingForConfirmation) {
+                showTransientNotification('Límite Mínimo', `El conteo está en el Límite Mínimo (${COUNT_MIN})`, 'info', 2000);
+            }
+            
+            saveLog();
+        }
+
+        // --- Lógica de Tema Oscuro/Claro y Exportación ---
+        
+        function setTheme(isDark) {
+            if (isDark) {
+                htmlElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+            } else {
+                htmlElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            }
+        }
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+            if (savedTheme) {
+                setTheme(savedTheme === 'dark');
+            } else {
+                setTheme(systemPrefersDark);
+            }
+        }
+
+        function exportLog() {
+            if (logHistory.length === 0) {
+                showTransientNotification('ERROR', 'No hay registros para exportar.', 'error', 2000);
+                return;
+            }
+
+            const headers = ["Timestamp", "Ubicación", "Cambio", "Conteo Final"];
+            const csvRows = logHistory.map(entry => {
+                const location = entry.location.replace(/"/g, '""');
+                return [
+                    `"${entry.time}"`,
+                    `"${location}"`,
+                    entry.step,
+                    entry.newCount
+                ].join(',');
+            });
+
+            const csvContent = [headers.join(','), ...csvRows].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            const locationName = locationNameInput.value.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'sin_nombre';
+            const date = new Date().toISOString().slice(0, 10);
+            link.setAttribute("download", `registro_${locationName}_${date}.csv`);
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showTransientNotification('EXPORTADO', 'Registro descargado correctamente.', 'info', 1500);
+        }
+
+        // --- Manejadores de Eventos ---
+
+        buttons.forEach(button => {
+            button.addEventListener('click', () => {
+                const step = parseInt(button.dataset.step);
+                const newCount = count + step;
+
+                COUNT_MAX = parseInt(maxLimitInput.value) || Infinity;
+                COUNT_MIN = parseInt(minLimitInput.value) || 0;
+                
+                resetBtn.isWaitingForConfirmation = false;
+                
+                if (newCount > COUNT_MAX) {
+                    count = COUNT_MAX;
+                    showTransientNotification('¡ERROR!', `No se pudo añadir ${step} personas, aforo máximo (${COUNT_MAX}) alcanzado.`, 'error', 2000);
+                } else if (newCount < COUNT_MIN) {
+                    count = COUNT_MIN;
+                    showTransientNotification('¡ERROR!', `No se pudo restar ${Math.abs(step)} personas, límite mínimo (${COUNT_MIN}) alcanzado.`, 'error', 2000);
+                } else {
+                    count = newCount;
+                    const logEntry = {
+                        time: new Date().toISOString(),
+                        step: step,
+                        newCount: count,
+                        location: locationNameInput.value
+                    };
+                    logHistory.push(logEntry);
+                }
+                
+                updateDisplay();
+            });
+        });
+        
+        resetBtn.addEventListener('click', function originalResetHandler() {
+            showTransientNotification("CONFIRMAR REINICIO", "Haz clic de nuevo en 'Reiniciar Conteo' para confirmar y borrar los datos.", 'error', 3000);
+            this.isWaitingForConfirmation = true;
+            
+            const tempConfirmation = () => {
+                count = 0;
+                logHistory = []; 
+                localStorage.removeItem('logHistory');
+
+                alert80Shown = false;
+                alertMaxShown = false;
+
+                this.isWaitingForConfirmation = false;
+                updateDisplay();
+                
+                resetBtn.removeEventListener('click', tempConfirmation);
+                resetBtn.addEventListener('click', originalResetHandler); 
+                hideTransientNotification();
+                showTransientNotification('REINICIADO', 'El contador ha sido puesto a cero.', 'info', 1500);
+            };
+
+            resetBtn.removeEventListener('click', originalResetHandler);
+            resetBtn.addEventListener('click', tempConfirmation);
+
+            setTimeout(() => {
+                if (this.isWaitingForConfirmation) {
+                    this.isWaitingForConfirmation = false;
+                    resetBtn.removeEventListener('click', tempConfirmation);
+                    resetBtn.addEventListener('click', originalResetHandler);
+                    hideTransientNotification();
+                    updateDisplay();
+                }
+            }, 3000); 
+        });
+
+        menuExportBtn.addEventListener('click', () => {
+            exportLog();
+            dropdownMenu.classList.add('hidden');
+        });
+        
+        themeToggleBtn.addEventListener('click', () => {
+            const isCurrentlyDark = htmlElement.classList.contains('dark');
+            setTheme(!isCurrentlyDark);
+        });
+
+        minLimitInput.addEventListener('input', updateDisplay);
+        maxLimitInput.addEventListener('input', updateDisplay);
+
+        locationNameInput.addEventListener('input', (e) => {
+            localStorage.setItem('locationName', e.target.value);
+        });
+
+        // Eventos del Menú y Vistas
+        menuToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdownMenu.classList.toggle('hidden');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!dropdownMenu.classList.contains('hidden') && !menuToggle.contains(e.target) && !dropdownMenu.contains(e.target)) {
+                dropdownMenu.classList.add('hidden');
+            }
+        });
+        
+        viewStatsBtn.addEventListener('click', () => switchView('stats'));
+        viewCounterBtn.addEventListener('click', () => switchView('counter'));
+
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            initLocationName();
+            loadLog();
+            
+            if (logHistory.length > 0) {
+                count = logHistory[logHistory.length - 1].newCount;
+            }
+
+            updateDisplay();
+        });
+
+    </script>
+</body>
+</html>
